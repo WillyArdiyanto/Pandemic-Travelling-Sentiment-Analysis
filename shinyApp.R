@@ -13,12 +13,18 @@ library(RTextTools)
 library(e1071)
 library(syuzhet)
 library(caret)
+library(tidymodels)
+library(textdata)
+library(tidytext)
+library(forcats)
 
 #mengambil df
 tweetclean = read.csv("tweetclean_df.csv", stringsAsFactors = FALSE)
 
 #mengubah kolom text sebagai char
 tweet <- as.character(tweetclean$text)
+
+##----------------------------------------------batas edit-----------------------------------------------------##
 
 #Penentuan hasil sentimen analisis NRC dari tweet
 sentiment<-get_nrc_sentiment(tweet, language = "english")
@@ -37,12 +43,12 @@ data <- data.frame(text=tweet,sentiment=classify$text_sentiment)
 
 ui <- fluidPage(
   theme = shinytheme("darkly"),
-  titlePanel("Tweet about Travelling During Pandemic Situation"),
+  titlePanel( h1("Tweet about Travelling During Pandemic Situation")),
   mainPanel(
-    
-    tabsetPanel(type = "tabs",
+       tabsetPanel(type = "tabs",
                 tabPanel("Tweet Data", DT::dataTableOutput('data')), # Output Data Dalam Tabel
                 tabPanel("NRC Sentiment Analysis", plotOutput("nrc")), # Plot
+                tabPanel("Bing Sentiment Analysis", plotOutput("bing")), # Plot
                 tabPanel("Frequent Word", plotOutput('freq')), # Plot
                 tabPanel("Wordcloud", plotOutput("Wordcloud")) # Plot Wordcloud
     ),
@@ -121,9 +127,34 @@ server <- function(input, output, session) {
   output$nrc <- renderPlot({
     tweetsentiment<-cbind(tweetclean$text,sentiment)
     par(mar=rep(3,4))
-    barplot(colSums(sentiment),col=rainbow(10),ylab='count',main='Analisis Sentimen NRC')
+    barplot(colSums(sentiment),col=rainbow(5),ylab='count',main='Analisis Sentimen NRC')
   }, height=400)
   
+  #Analisis sentimen bing
+  output$bing <- renderPlot({
+    
+    separated <- data %>% 
+     filter(text != "nan") %>%
+      unnest_tokens(word, text) %>%
+      anti_join(stop_words) 
+    
+    bing_word_counts <- separated %>%
+      inner_join(get_sentiments("bing")) %>%
+      count(word, sentiment, sort = TRUE) %>%
+      ungroup()
+    
+    bing_word_counts %>%
+      group_by(sentiment) %>%
+      slice_max(n, n=10) %>%
+      ungroup() %>%
+      mutate(word = reorder(word,n)) %>%
+      ggplot(aes(n,word,fill=sentiment))+
+      geom_col(show.legend = FALSE) +
+      facet_wrap(~sentiment, scales = "free_y") +
+      labs(x = "Contribution to sentiment",
+           y = NULL)
+    
+   }, height=400)
   
   #Output kata yang sering muncul
     output$freq <- renderPlot({
@@ -135,8 +166,8 @@ server <- function(input, output, session) {
     v<-sort(rowSums(m),decreasing = TRUE)
     d<-data.frame(word=names(v),freq=v)
     barplot(d[1:10,]$freq, las = 2, names.arg = d[1:10,]$word,
-            col ="lightgreen", main ="Most frequent words",
-            ylab = "Word frequencies")
+           main ="Frequent words",
+            ylab = "Frequency")
   })
   
   #wordcloud
@@ -145,8 +176,9 @@ server <- function(input, output, session) {
     corpus <- Corpus(VectorSource(tweetclean$text))
     corpus<-tm_map(corpus, removeWords, c("travelling","pandemic","travel"))
    
-    wordcloud(corpus, random.order = F, max.words=100, col=brewer.pal(8, "Accent"), )
+    wordcloud(corpus, random.order = F, max.words=100 , col=rainbow(100))
     })
 }
 
-shinyApp(ui = ui, server = server, options = list(height = "1000px"))
+
+shinyApp(ui = ui, server = server, options = list(height = "1080px"))
