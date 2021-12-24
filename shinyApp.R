@@ -24,8 +24,6 @@ tweetclean = read.csv("tweetclean_df.csv", stringsAsFactors = FALSE)
 #mengubah kolom text sebagai char
 tweet <- as.character(tweetclean$text)
 
-##----------------------------------------------batas edit-----------------------------------------------------##
-
 #Penentuan hasil sentimen analisis NRC dari tweet
 sentiment<-get_nrc_sentiment(tweet, language = "english")
 tweetsentiment<-cbind(tweetclean$text,sentiment)
